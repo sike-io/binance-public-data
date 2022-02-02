@@ -30,9 +30,6 @@ def download_file(base_path, file_name, date_range=None, folder=None):
   download_path = "{}{}".format(base_path, file_name)
   if folder:
     base_path = os.path.join(folder, base_path)
-  if date_range:
-    date_range = date_range.replace(" ","_")
-    base_path = os.path.join(base_path, date_range)
   save_path = get_destination_dir(os.path.join(base_path, file_name), folder)
   
 
@@ -85,20 +82,6 @@ def match_date_regex(arg_value, pat=re.compile(r'\d{4}-\d{2}-\d{2}')):
     raise ArgumentTypeError
   return arg_value
 
-def check_directory(arg_value):
-  if os.path.exists(arg_value):
-    while True:
-      option = input('Folder already exists! Do you want to overwrite it? y/n  ')
-      if option != 'y' and option != 'n':
-        print('Invalid Option!')
-        continue
-      elif option == 'y':
-        shutil.rmtree(arg_value)
-        break
-      else:
-        break
-  return arg_value
-
 def get_path(trading_type, market_data_type, time_period, symbol, interval=None):
   trading_type_path = 'data/spot'
   if trading_type != 'spot':
@@ -130,7 +113,7 @@ def get_parser(parser_type):
       '-endDate', dest='endDate', type=match_date_regex,
       help='Ending date to download in [YYYY-MM-DD] format')
   parser.add_argument(
-      '-folder', dest='folder', type=check_directory,
+      '-folder', dest='folder',
       help='Directory to store the downloaded data')
   parser.add_argument(
       '-c', dest='checksum', default=0, type=int, choices=[0,1],
