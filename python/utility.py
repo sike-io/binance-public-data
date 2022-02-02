@@ -1,10 +1,11 @@
-import os, sys, re, shutil
+import io, os, sys, re, shutil
 import json
 from pathlib import Path
 from datetime import *
 import urllib.request
 from argparse import ArgumentParser, RawTextHelpFormatter, ArgumentTypeError
 from enums import *
+from google.cloud import storage
 
 def get_destination_dir(file_url, folder=None):
   store_directory = os.environ.get('STORE_DIRECTORY')
@@ -26,21 +27,39 @@ def get_all_symbols(type):
     response = urllib.request.urlopen("https://api.binance.com/api/v3/exchangeInfo").read()
   return list(map(lambda symbol: symbol['symbol'], json.loads(response)['symbols']))
 
-def download_file(base_path, file_name, date_range=None, folder=None):
+def gs_obj_exists(bucket_name, filename):
+  storage_client = storage.Client()
+  bucket = storage_client.bucket(bucket_name)
+  blob = bucket.blob(filename)
+  return blob.exists()
+
+def upload_to_gs(bucket_name, filename, buffer):
+  storage_client = storage.Client()
+  bucket = storage_client.bucket(bucket_name)
+  blob = bucket.blob(filename)
+  print()
+  print(f"upload to gs://{bucket_name}/{filename}")
+  sys.stdout.flush()
+  blob.upload_from_file(io.BytesIO(bytes(buffer)))
+
+def download_file(base_path, file_name, date_range=None, folder=None, gs_bucket=None):
   download_path = "{}{}".format(base_path, file_name)
+  local_save_path = get_destination_dir(os.path.join(base_path, file_name), folder)
+  gs_save_path = os.path.join(base_path.replace("data/","binance/"), file_name)
   if folder:
     base_path = os.path.join(folder, base_path)
-  save_path = get_destination_dir(os.path.join(base_path, file_name), folder)
-  
+    if os.path.exists(local_save_path):
+      print("\nfile already exists! {}".format(local_save_path))
+      local_save_path = None
+    # make the directory
+    if not os.path.exists(base_path):
+      Path(get_destination_dir(base_path)).mkdir(parents=True, exist_ok=True)
 
-  if os.path.exists(save_path):
-    print("\nfile already exists! {}".format(save_path))
-    return
-  
-  # make the directory
-  if not os.path.exists(base_path):
-    Path(get_destination_dir(base_path)).mkdir(parents=True, exist_ok=True)
-
+  if gs_bucket and gs_obj_exists(gs_bucket, gs_save_path):
+    print(f"\ffile already exists! gs://{gs_bucket}/{gs_save_path}")
+    gs_save_path = None
+  buffer = bytearray()
+  # download
   try:
     download_url = get_download_url(download_path)
     dl_file = urllib.request.urlopen(download_url)
@@ -49,22 +68,29 @@ def download_file(base_path, file_name, date_range=None, folder=None):
       length = int(length)
       blocksize = max(4096,length//100)
 
-    with open(save_path, 'wb') as out_file:
-      dl_progress = 0
-      print("\nFile Download: {}".format(save_path))
-      while True:
-        buf = dl_file.read(blocksize)   
-        if not buf:
-          break
-        dl_progress += len(buf)
-        out_file.write(buf)
-        done = int(50 * dl_progress / length)
-        sys.stdout.write("\r[%s%s]" % ('#' * done, '.' * (50-done)) )    
-        sys.stdout.flush()
-
+    dl_progress = 0
+    print("\nFile Download: {}".format(download_url))
+    while True:
+      buf = dl_file.read(blocksize)   
+      if not buf:
+        break
+      dl_progress += len(buf)
+      buffer.extend(buf)
+      done = int(50 * dl_progress / length)
+      sys.stdout.write("\r[%s%s]" % ('#' * done, '.' * (50-done)) )    
+      sys.stdout.flush()
   except urllib.error.HTTPError:
     print("\nFile not found: {}".format(download_url))
-    pass
+    return
+
+  # write to local file
+  if folder and local_save_path:
+    with open(local_save_path, 'wb') as out_file:
+      out_file.write(buffer)
+  
+  # write to goolge storage
+  if gs_bucket and gs_save_path:
+    upload_to_gs(gs_bucket, gs_save_path, buffer)
 
 def convert_to_date_object(d):
   year, month, day = [int(x) for x in d.split('-')]
@@ -115,6 +141,9 @@ def get_parser(parser_type):
   parser.add_argument(
       '-folder', dest='folder',
       help='Directory to store the downloaded data')
+  parser.add_argument(
+      '-gs_bucket', dest='gs_bucket',
+      help='Google Storage bucket to store the downloaded data')
   parser.add_argument(
       '-c', dest='checksum', default=0, type=int, choices=[0,1],
       help='1 to download checksum file, default 0')

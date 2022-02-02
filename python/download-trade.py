@@ -16,7 +16,7 @@ from utility import download_file, get_all_symbols, get_parser, get_start_end_da
   get_path
 
 
-def download_monthly_trades(trading_type, symbols, num_symbols, years, months, start_date, end_date, folder, checksum):
+def download_monthly_trades(trading_type, symbols, num_symbols, years, months, start_date, end_date, folder, checksum, gs_bucket):
   current = 0
   date_range = None
 
@@ -43,16 +43,16 @@ def download_monthly_trades(trading_type, symbols, num_symbols, years, months, s
         if current_date >= start_date and current_date <= end_date:
           path = get_path(trading_type, "trades", "monthly", symbol)
           file_name = "{}-trades-{}-{}.zip".format(symbol.upper(), year, '{:02d}'.format(month))
-          download_file(path, file_name, date_range, folder)
+          download_file(path, file_name, date_range, folder, gs_bucket)
 
           if checksum == 1:
             checksum_path = get_path(trading_type, "trades", "monthly", symbol)
             checksum_file_name = "{}-trades-{}-{}.zip.CHECKSUM".format(symbol.upper(), year, '{:02d}'.format(month))
-            download_file(checksum_path, checksum_file_name, date_range, folder)
+            download_file(checksum_path, checksum_file_name, date_range, folder, gs_bucket)
     
     current += 1
 
-def download_daily_trades(trading_type, symbols, num_symbols, dates, start_date, end_date, folder, checksum):
+def download_daily_trades(trading_type, symbols, num_symbols, dates, start_date, end_date, folder, checksum, gs_bucket):
   current = 0
   date_range = None
 
@@ -78,12 +78,12 @@ def download_daily_trades(trading_type, symbols, num_symbols, dates, start_date,
       if current_date >= start_date and current_date <= end_date:
         path = get_path(trading_type, "trades", "daily", symbol)
         file_name = "{}-trades-{}.zip".format(symbol.upper(), date)
-        download_file(path, file_name, date_range, folder)
+        download_file(path, file_name, date_range, folder, gs_bucket)
 
         if checksum == 1:
           checksum_path = get_path(trading_type, "trades", "daily", symbol)
           checksum_file_name = "{}-trades-{}.zip.CHECKSUM".format(symbol.upper(), date)
-          download_file(checksum_path, checksum_file_name, date_range, folder)
+          download_file(checksum_path, checksum_file_name, date_range, folder, gs_bucket)
 
     current += 1
 
@@ -105,6 +105,6 @@ if __name__ == "__main__":
     else:
       dates = pd.date_range(end = datetime.today(), periods = MAX_DAYS).to_pydatetime().tolist()
       dates = [date.strftime("%Y-%m-%d") for date in dates]
-      download_monthly_trades(args.type, symbols, num_symbols, args.years, args.months, args.startDate, args.endDate, args.folder, args.checksum)
-    download_daily_trades(args.type, symbols, num_symbols, dates, args.startDate, args.endDate, args.folder, args.checksum)
+      download_monthly_trades(args.type, symbols, num_symbols, args.years, args.months, args.startDate, args.endDate, args.folder, args.checksum, args.gs_bucket)
+    download_daily_trades(args.type, symbols, num_symbols, dates, args.startDate, args.endDate, args.folder, args.checksum, args.gs_bucket)
     
