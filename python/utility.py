@@ -54,10 +54,19 @@ def download_file(base_path, file_name, date_range=None, folder=None, gs_bucket=
     # make the directory
     if not os.path.exists(base_path):
       Path(get_destination_dir(base_path)).mkdir(parents=True, exist_ok=True)
+  else:
+    local_save_path = None
 
-  if gs_bucket and gs_obj_exists(gs_bucket, gs_save_path):
-    print(f"\ffile already exists! gs://{gs_bucket}/{gs_save_path}")
+  if gs_bucket:
+    if gs_obj_exists(gs_bucket, gs_save_path):
+      print(f"\nfile already exists! gs://{gs_bucket}/{gs_save_path}")
+      gs_save_path = None
+  else:
     gs_save_path = None
+
+  if local_save_path == None and gs_save_path == None:
+    return
+
   buffer = bytearray()
   # download
   try:
