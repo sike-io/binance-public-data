@@ -86,10 +86,8 @@ def download_file(base_path, file_name, date_range=None, folder=None, gs_bucket=
       dl_progress += len(buf)
       buffer.extend(buf)
       done = int(50 * dl_progress / length)
-      sys.stdout.write("\r[%s%s]" % ('#' * done, '.' * (50-done)) )    
-      sys.stdout.flush()
-  except urllib.error.HTTPError:
-    print("\nFile not found: {}".format(download_url))
+  except urllib.error.HTTPError as ex:
+    print("\nDownload Error: {}\n{}".format(download_url, ex))
     return
 
   # write to local file
